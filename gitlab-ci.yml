@@ -1,0 +1,54 @@
+# Especifica a imagem Docker base que será usada para executar os trabalhos do Maven
+image: maven:3.8.5-openjdk-17-slim
+
+# Define variáveis de ambiente que serão usadas durante a execução dos comandos Maven
+variables:
+  MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode --errors --fail-at-end --show-version"
+
+# Define as diferentes fases do pipeline
+stages:
+  - build      # Fase de construção do projeto
+  - test       # Fase de execução dos testes
+  - docker-build # Fase de construção da imagem Docker
+  - deploy     # Fase de deploy (pode ser personalizado conforme necessário)
+
+# Configura o cache para armazenar dependências Maven entre builds, acelerando o processo
+cache:
+  paths:
+    - .m2/repository
+
+# Comandos que serão executados antes de cada trabalho
+before_script:
+  - echo "MAVEN_CLI_OPTS=$MAVEN_CLI_OPTS"
+
+# Definição do trabalho de build
+build:
+  stage: build
+  script:
+    - mvn $MAVEN_CLI_OPTS clean install   # Executa o comando Maven para construir o projeto
+  artifacts:
+    paths:
+      - target/*.jar                      # Especifica os artefatos gerados pelo build que serão preservados
+
+# Definição do trabalho de test
+test:
+  stage: test
+  script:
+    - mvn $MAVEN_CLI_OPTS test            # Executa os testes do projeto
+
+# Definição do trabalho de docker-build
+docker-build:
+  stage: docker-build
+  image: docker:latest                    # Usa a imagem Docker mais recente para construir e enviar imagens Docker
+  services:
+    - docker:dind                         # Usa Docker-in-Docker para permitir o uso de comandos Docker
+  script:
+    - docker build -t my-dockerhub-username/my-spring-app:latest .   # Constrói a imagem Docker do projeto
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin # Faz login no Docker Hub
+    - docker push my-dockerhub-username/my-spring-app:latest         # Envia a imagem Docker para o Docker Hub
+
+# Definição do trabalho de deploy
+deploy:
+  stage: deploy
+  script:
+    - echo "Deployment step - can be customized as needed"  # Passo de deploy pode ser personalizado conforme necessário
