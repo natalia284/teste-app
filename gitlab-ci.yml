@@ -5,7 +5,7 @@ image: maven:3.8.5-openjdk-17-slim
 variables:
   MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode --errors --fail-at-end --show-version"
 
-# Define as diferentes fases do pipeline
+# Define as diferentes fases do pipeline 
 stages:
   - build      # Fase de construção do projeto
   - test       # Fase de execução dos testes
