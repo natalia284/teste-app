@@ -1,54 +1,41 @@
-# Especifica a imagem Docker base que será usada para executar os trabalhos do Maven
-image: maven:3.8.5-openjdk-17-slim
+name: CI/CD Pipeline
 
-# Define variáveis de ambiente que serão usadas durante a execução dos comandos Maven
-variables:
-  MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode --errors --fail-at-end --show-version"
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
-# Define as diferentes fases do pipeline
-stages:
-  - build      # Fase de construção do projeto
-  - test       # Fase de execução dos testes
-  - docker-build # Fase de construção da imagem Docker
-  - deploy     # Fase de deploy (pode ser personalizado conforme necessário)
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-# Configura o cache para armazenar dependências Maven entre builds, acelerando o processo
-cache:
-  paths:
-    - .m2/repository
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-# Comandos que serão executados antes de cada trabalho
-before_script:
-  - echo "MAVEN_CLI_OPTS=$MAVEN_CLI_OPTS"
+    - name: Set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        distribution: 'temurin'
+        java-version: '17'
 
-# Definição do trabalho de build
-build:
-  stage: build
-  script:
-    - mvn $MAVEN_CLI_OPTS clean install   # Executa o comando Maven para construir o projeto
-  artifacts:
-    paths:
-      - target/*.jar                      # Especifica os artefatos gerados pelo build que serão preservados
+    - name: Build with Maven
+      run: mvn clean install
 
-# Definição do trabalho de test
-test:
-  stage: test
-  script:
-    - mvn $MAVEN_CLI_OPTS test            # Executa os testes do projeto
+    - name: Run tests
+      run: mvn test
 
-# Definição do trabalho de docker-build
-docker-build:
-  stage: docker-build
-  image: docker:latest                    # Usa a imagem Docker mais recente para construir e enviar imagens Docker
-  services:
-    - docker:dind                         # Usa Docker-in-Docker para permitir o uso de comandos Docker
-  script:
-    - docker build -t my-dockerhub-username/my-spring-app:latest .   # Constrói a imagem Docker do projeto
-    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin # Faz login no Docker Hub
-    - docker push my-dockerhub-username/my-spring-app:latest         # Envia a imagem Docker para o Docker Hub
+    - name: Build Docker image
+      run: docker build -t my-dockerhub-username/my-spring-app:latest .
 
-# Definição do trabalho de deploy
-deploy:
-  stage: deploy
-  script:
-    - echo "Deployment step - can be customized as needed"  # Passo de deploy pode ser personalizado conforme necessário
+    - name: Log in to Docker Hub
+      env:
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+    - name: Push Docker image
+      run: docker push my-dockerhub-username/my-spring-app:latest
